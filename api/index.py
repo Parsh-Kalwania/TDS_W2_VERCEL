@@ -1,24 +1,38 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 import json
+from http.server import BaseHTTPRequestHandler
+import urllib.parse
 
-app = FastAPI()
+# Load student data from the JSON file
+def load_data():
+    with open('q-vercel-python.json', 'r') as file:
+        data = json.load(file)
+    return data
 
-# CORS setup
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Handler class to process incoming requests
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Parse the query parameters
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
 
-# Load marks
-with open("q-vercel-python.json") as f:
-    data = json.load(f)
+        # Get 'name' parameters from the query string
+        names = query.get('name', [])
 
-@app.get("/api")
-async def get_marks(request: Request):
-    names = request.query_params.getlist("name")
-    marks = [data.get(name, 0) for name in names]
-    return JSONResponse(content={"marks": marks})
+        # Load data from the JSON file
+        data = load_data()
+
+        # Prepare the result dictionary
+        result = {"marks": []}
+        for name in names:
+            # Find the marks for each name
+            for entry in data:
+                if entry["name"] == name:
+                    result["marks"].append(entry["marks"])
+
+        # Send the response header
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')  # Enable CORS for any origin
+        self.end_headers()
+
+        # Send the JSON response
+        self.wfile.write(json.dumps(result).encode('utf-8'))
